@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <div class="eyebrow">{% if me.role == 'staff' %}<a href="{{ url_for('staff_dashboard') }}">Staff</a> / {% endif %}Campus communication</div>
+    <h1>Notices</h1>
+    <p>{% if me.role == 'staff' %}Published college announcements for staff.{% else %}Important academic and administrative announcements.{% endif %}</p>
+  </div>
+  {% if me.role == 'admin' %}<button class="primary" data-bs-toggle="modal" data-bs-target="#notice">Publish notice</button>{% elif me.role == 'staff' %}<a class="primary" href="{{ url_for('staff_dashboard') }}">Back to Dashboard</a>{% endif %}
+</header>
+
+<form class="filters admin-filters" method="get">
+  <input name="q" value="{{ filters.q }}" placeholder="Search notice title or description">
+  <select name="category">
+    <option value="">All categories</option>
+    {% for category in categories %}<option value="{{ category }}" {% if filters.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}
+  </select>
+  <button type="submit">Search notices</button>
+</form>
+
+{% if detail_notice %}
+<section class="panel">
+  <div><span class="tag">{{ detail_notice.category or 'General' }}</span><span class="muted">{{ detail_notice.audience }}</span></div>
+  <h2>{{ detail_notice.title }}</h2>
+  <p>{{ detail_notice.body }}</p>
+  <small>{{ detail_notice.published_on.strftime('%d %B %Y') }}</small>
+  <p><a class="link" href="{{ url_for('notices', q=filters.q, category=filters.category) }}">Back to notices</a></p>
+</section>
+{% endif %}
+
+<section class="notice-list">
+  {% for n in rows %}
+    <article class="panel">
+      <div><span class="tag">{{ n.category or 'General' }}</span><span class="muted">{{ n.audience }}</span></div>
+      <h2><a class="notice-title-link" href="{{ url_for('notices', detail=n.id, q=filters.q, category=filters.category) }}">{{ n.title }}</a></h2>
+      <p>{{ n.body|truncate(240) }}</p>
+      <small>{{ n.published_on.strftime('%d %B %Y') }}</small>
+      <p><a class="link" href="{{ url_for('notices', detail=n.id, q=filters.q, category=filters.category) }}">View details</a></p>
+    </article>
+  {% else %}
+    <p class="muted">No notices to show.</p>
+  {% endfor %}
+</section>
+
+{% if me.role == 'admin' %}
+<div class="modal fade" id="notice"><div class="modal-dialog"><form method="post" class="modal-content"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><div class="modal-header"><h5>Publish notice</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body form-grid"><input required name="title" placeholder="Notice title"><select name="audience"><option>All</option><option>Student</option><option>Staff</option></select><input name="category" placeholder="Category" value="General"><textarea required name="body" placeholder="Write the notice"></textarea></div><div class="modal-footer"><button class="primary">Publish</button></div></form></div></div>
+{% endif %}
+{% endblock %}

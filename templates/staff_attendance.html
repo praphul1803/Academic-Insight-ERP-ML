@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+  <div><div class="eyebrow"><a href="{{ url_for('staff_dashboard') }}">Staff</a> / Academic records</div><h1>Attendance Management</h1><p>Record and review attendance only for assigned students and subjects.</p></div>
+  <a class="primary" href="{{ url_for('staff_dashboard') }}">Back to Dashboard</a>
+</header>
+
+<form class="filters admin-filters" method="get">
+  <select name="subject_id">
+    <option value="">All assigned subjects</option>
+    {% for subject in subjects %}<option value="{{ subject.id }}" {% if selected_subject and selected_subject.id == subject.id %}selected{% endif %}>{{ subject.name }}{% if subject.course %} · {{ subject.course.name }}, Sem {{ subject.semester }}{% endif %}</option>{% endfor %}
+  </select>
+  <input name="q" value="{{ filters.q }}" placeholder="Search student name or roll number">
+  <select name="course"><option value="">All courses</option>{% for item in courses %}<option value="{{ item }}" {% if filters.course == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+  <select name="semester"><option value="">All semesters</option>{% for item in semesters %}<option value="{{ item }}" {% if filters.semester == item %}selected{% endif %}>Semester {{ item }}</option>{% endfor %}</select>
+  <select name="division"><option value="">All divisions</option>{% for item in divisions %}<option value="{{ item }}" {% if filters.division == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+  <input type="date" name="date" value="{{ filters.date }}" aria-label="Filter by date">
+  <select name="status"><option value="">All statuses</option><option value="Present" {% if filters.status == 'Present' %}selected{% endif %}>Present</option><option value="Absent" {% if filters.status == 'Absent' %}selected{% endif %}>Absent</option></select>
+  <button type="submit">Search / Filter</button>
+  <a class="primary" href="{{ url_for('report', name='attendance') }}">Download attendance CSV</a>
+</form>
+
+{% if subjects %}
+<section class="panel">
+  <h2>{% if editing_record %}Edit attendance register{% else %}Mark or update attendance{% endif %}</h2>
+  {% if selected_subject %}
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="subject_id" value="{{ selected_subject.id }}">
+    <input type="hidden" name="course" value="{{ filters.course }}">
+    <input type="hidden" name="semester" value="{{ filters.semester or '' }}">
+    <input type="hidden" name="division" value="{{ filters.division }}">
+    <input type="hidden" name="q" value="{{ filters.q }}">
+    <div class="form-grid attendance-register-fields">
+      <label class="admin-field"><span>Assigned Subject</span><input value="{{ selected_subject.name }}" disabled></label>
+      <label class="admin-field"><span>Date</span><input required type="date" name="attendance_date" value="{{ attendance_date_value }}"></label>
+      <label class="admin-field"><span>Period</span><input required type="number" name="period" min="1" value="{{ period_value }}"></label>
+    </div>
+    <div class="table-panel">
+      <table><thead><tr><th>Roll Number</th><th>Student</th><th>Course / Semester / Division</th><th>Attendance %</th><th>Mark</th></tr></thead><tbody>
+        {% for student in students %}
+          <tr>
+            <td>{{ student.student_code }}<input type="hidden" name="student_id" value="{{ student.id }}"></td>
+            <td><b>{{ student.full_name }}</b></td>
+            <td>{{ student.course }} · {{ student.semester }} · {{ student.division }}</td>
+            <td>{{ percentages[student.id] }}%</td>
+            <td><select name="status_{{ student.id }}"><option value="Present" {% if register_status.get(student.id, 'Present') == 'Present' %}selected{% endif %}>Present</option><option value="Absent" {% if register_status.get(student.id) == 'Absent' %}selected{% endif %}>Absent</option></select></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="muted">No students are assigned to this subject under the selected filters.</td></tr>
+        {% endfor %}
+      </tbody></table>
+    </div>
+    {% if students %}<div class="admin-form-actions"><button class="primary" type="submit">Save attendance</button></div>{% endif %}
+  </form>
+  {% else %}
+    <p class="muted">Select an assigned subject above to mark attendance.</p>
+  {% endif %}
+</section>
+{% else %}
+<section class="panel"><p class="muted">No subjects are assigned to your account.</p></section>
+{% endif %}
+
+<section class="panel table-panel">
+  <h2>Attendance history</h2>
+  <table><thead><tr><th>Date / Period</th><th>Roll Number</th><th>Student</th><th>Course / Term</th><th>Subject</th><th>Status</th><th></th></tr></thead><tbody>
+    {% for row in history %}
+      <tr><td>{{ row.attendance_date.strftime('%d %b %Y') }} · P{{ row.period }}</td><td>{{ row.student.student_code }}</td><td>{{ row.student.full_name }}</td><td>{{ row.student.course }} · {{ row.student.semester }} {{ row.student.division }}</td><td>{{ row.subject }}</td><td><span class="pill {{ 'good' if row.status == 'Present' else 'bad' }}">{{ row.status }}</span></td><td><a class="link" href="{{ url_for('attendance', edit=row.id, subject_id=selected_subject.id if selected_subject else '', q=filters.q, course=filters.course, semester=filters.semester, division=filters.division) }}">Edit</a></td></tr>
+    {% else %}<tr><td colspan="7" class="muted">No attendance records match the selected filters.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}

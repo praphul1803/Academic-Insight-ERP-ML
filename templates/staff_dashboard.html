@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <div class="eyebrow">Staff workspace</div>
+    <h1>{{ title }}</h1>
+    <p>{{ today.strftime('%A, %d %B %Y') }} · Welcome, {{ me.staff.full_name }}.</p>
+  </div>
+  <div class="avatar">{{ me.staff.full_name[0]|upper }}</div>
+</header>
+
+{% set metric_routes = {
+  'Assigned Students': url_for('students'),
+  'Assigned Subjects': url_for('marks'),
+  "Today's Attendance Entries": url_for('attendance'),
+  'Total Assessment Marks Entered': url_for('marks')
+} %}
+<section class="metrics">
+  {% for label, value in metrics.items() %}
+  <a class="metric-link" href="{{ metric_routes[label] }}">
+    <article><small>{{ label }}</small><strong>{{ value }}</strong><span>Live assigned records</span></article>
+  </a>
+  {% endfor %}
+</section>
+
+<section class="panel staff-quick-access">
+  <h2>Quick access</h2>
+  <div class="staff-quick-grid">
+    <a class="staff-quick-card" href="{{ url_for('students') }}"><b>Student Management</b><span>Search assigned students and review their records.</span></a>
+    <a class="staff-quick-card" href="{{ url_for('attendance') }}"><b>Attendance Management</b><span>Mark and review attendance for assigned classes.</span></a>
+    <a class="staff-quick-card" href="{{ url_for('marks') }}"><b>Assessment Management</b><span>Enter and export 20 + 20 + 10 assessment marks.</span></a>
+    <a class="staff-quick-card" href="{{ url_for('bulk_prediction') }}"><b>Bulk Performance Prediction</b><span>Upload a CSV and review the actual model results.</span></a>
+    <a class="staff-quick-card" href="{{ url_for('notices') }}"><b>Latest Notices</b><span>Read published college announcements.</span></a>
+    <a class="staff-quick-card" href="{{ url_for('profile') }}"><b>My Profile</b><span>Update your contact details and password.</span></a>
+  </div>
+</section>
+
+<div class="grid-two">
+  <section class="panel">
+    <h2>Assigned subjects</h2>
+    {% if subjects %}
+      <div class="staff-subject-list">
+        {% for subject in subjects %}
+          <div><b>{{ subject.name }}</b><span>{{ subject.course.name if subject.course else 'Course not specified' }} · Semester {{ subject.semester }}</span></div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No subjects are assigned to your account.</p>
+    {% endif %}
+  </section>
+  <section class="panel">
+    <h2>Assigned students</h2>
+    {% if students %}
+      <div class="staff-student-preview">
+        {% for student in students %}
+          <a href="{{ url_for('students', details=student.id) }}"><b>{{ student.full_name }}</b><span>{{ student.student_code }} · {{ student.course }} · Sem {{ student.semester }}</span></a>
+        {% endfor %}
+      </div>
+      <a class="link" href="{{ url_for('students') }}">View all assigned students</a>
+    {% else %}
+      <p class="muted">No students are currently assigned.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="panel notices">
+  <h2>Latest notices</h2>
+  {% for notice in notices %}
+    <article><span>{{ notice.category or 'General' }}</span><b><a href="{{ url_for('notices', detail=notice.id) }}">{{ notice.title }}</a></b><p>{{ notice.body|truncate(180) }}</p><small>{{ notice.published_on.strftime('%d %b %Y') }}</small></article>
+  {% else %}
+    <p class="muted">No admin notices have been published for staff.</p>
+  {% endfor %}
+  <a class="link" href="{{ url_for('notices') }}">View all notices</a>
+</section>
+{% endblock %}

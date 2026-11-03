@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block content %}
+{% if me.role == 'staff' %}
+  {% set p = me.staff %}
+  <header class="page-head">
+    <div>
+      <div class="eyebrow"><a href="{{ url_for('staff_dashboard') }}">Staff</a> / My Profile</div>
+      <h1>My Profile</h1>
+      <p>Manage your permitted contact information and account password.</p>
+    </div>
+    <a class="primary" href="{{ url_for('staff_dashboard') }}">Back to Dashboard</a>
+  </header>
+  <div class="grid-two">
+    <section class="panel">
+      <h2>Staff information</h2>
+      <form method="post" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="profile">
+        <label class="admin-field"><span>Staff Name</span><input name="full_name" value="{{ p.full_name }}" required maxlength="120"></label>
+        <label class="admin-field"><span>Staff ID</span><input value="{{ p.employee_code }}" disabled></label>
+        <label class="admin-field"><span>Email Address</span><input name="email" type="email" value="{{ me.email }}" required maxlength="120"></label>
+        <label class="admin-field"><span>Phone Number</span><input name="phone" type="tel" value="{{ p.phone or '' }}" maxlength="20"></label>
+        <label class="admin-field"><span>Department</span><input value="{{ p.department }}" disabled></label>
+        <div class="admin-form-actions"><button class="primary" type="submit">Save Profile</button></div>
+      </form>
+      <h3 class="admin-subheading">Assigned Subjects</h3>
+      {% if staff_subjects %}
+        <ul>{% for subject in staff_subjects %}<li>{{ subject.name }}{% if subject.course %} · {{ subject.course.name }}{% endif %} · Semester {{ subject.semester }}</li>{% endfor %}</ul>
+      {% else %}
+        <p class="muted">No subjects are assigned to your account.</p>
+      {% endif %}
+      <p class="muted">Account status: {{ 'Active' if me.active else 'Inactive' }} · Member since {{ p.created_at.strftime('%d %b %Y') }}</p>
+    </section>
+    <section class="panel">
+      <h2>Change password</h2>
+      <form method="post" class="form-grid">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="password">
+        <label class="admin-field"><span>Current Password</span><input name="current_password" type="password" autocomplete="current-password" required></label>
+        <label class="admin-field"><span>New Password</span><input name="new_password" type="password" minlength="8" autocomplete="new-password" required></label>
+        <div class="admin-form-actions"><button class="primary" type="submit">Update Password</button></div>
+      </form>
+    </section>
+  </div>
+{% else %}
+  {% set p=me.student %}
+  <header class="page-head">
+    <div><div class="eyebrow"><a href="{{ url_for('student_dashboard') }}">Student</a> / Account</div><h1>My profile</h1><p>Personal and academic information.</p></div>
+    <div>
+      <a class="primary" href="{{ url_for('student_dashboard') }}">Back to Dashboard</a>
+      {% if not edit_mode %}<a class="primary" href="{{ url_for('profile', edit=1) }}">Edit Profile</a>{% endif %}
+    </div>
+  </header>
+  {% if edit_mode %}
+    {% set values = form_values or {'full_name': p.full_name, 'email': me.email, 'phone': p.phone or ''} %}
+    <div class="grid-two">
+      <section class="panel">
+        <h2>Edit personal information</h2>
+        <form method="post" class="form-grid" id="student-profile-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="student_profile">
+          <label class="admin-field"><span>Full Name</span><input name="full_name" value="{{ values.full_name }}" required maxlength="120" autocomplete="name"></label>
+          <label class="admin-field"><span>Email Address</span><input name="email" type="email" value="{{ values.email }}" required maxlength="120" autocomplete="email"></label>
+          <label class="admin-field"><span>Mobile Number</span><input name="phone" type="tel" value="{{ values.phone }}" maxlength="20" pattern="\+?[0-9][0-9\s().-]*" autocomplete="tel" aria-describedby="student-phone-help"><small id="student-phone-help" class="muted">Optional; use 7 to 15 digits.</small></label>
+          <div class="admin-form-actions">
+            <button class="primary" type="submit" id="student-profile-submit">Save Changes</button>
+            <a class="primary" href="{{ url_for('profile') }}">Cancel</a>
+          </div>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Academic information</h2>
+        <p><strong>Student ID / Roll Number:</strong> {{ p.student_code }}</p>
+        <p><strong>Department:</strong> {{ p.department }}</p>
+        <p><strong>Course:</strong> {{ p.course }}</p>
+        <p><strong>Semester:</strong> {{ p.semester }}</p>
+        <p><strong>Division:</strong> {{ p.division }}</p>
+        <p><strong>Role:</strong> {{ me.role|title }}</p>
+        <p class="muted">Academic and account permissions are managed by an administrator.</p>
+      </section>
+    </div>
+    <script>
+      document.getElementById('student-profile-form').addEventListener('submit', function () {
+        const button = document.getElementById('student-profile-submit');
+        button.disabled = true;
+        button.textContent = 'Saving...';
+        button.setAttribute('aria-busy', 'true');
+      });
+    </script>
+  {% else %}
+    <section class="panel profile">
+      <div class="avatar large">{{ p.full_name[0]|upper }}</div>
+      <div><h2>{{ p.full_name }}</h2><p>{{ p.email }}</p><span class="pill good">{{ me.role|title }}</span></div>
+      <dl><dt>Student ID / Roll Number</dt><dd>{{ p.student_code }}</dd><dt>Department</dt><dd>{{ p.department }}</dd><dt>Course</dt><dd>{{ p.course }}</dd><dt>Semester</dt><dd>{{ p.semester }}</dd><dt>Division</dt><dd>{{ p.division }}</dd><dt>Mobile Number</dt><dd>{{ p.phone or 'Not provided' }}</dd></dl>
+    </section>
+  {% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+	<div>
+		<div class="eyebrow">{{ me.role }} workspace</div>
+		<h1>{{ title }}</h1>
+		<p>{{ today.strftime('%A, %d %B %Y') }}</p>
+	</div>
+	<div class="avatar">{{ me.email[0]|upper }}</div>
+</header>
+
+<section class="metrics">
+	{% set metric_routes = {
+		'Total Students': url_for('admin_management', section='students'),
+		'Total Staff': url_for('admin_management', section='staff'),
+		'Total Courses': url_for('admin_management', section='courses'),
+		'Total Subjects': url_for('admin_management', section='subjects'),
+		'Total Fees Collected': url_for('admin_management', section='fees'),
+		'Pending Fees': url_for('admin_management', section='fees', status='pending'),
+		'Average Attendance': url_for('admin_management', section='attendance'),
+		'Academic Performance Average': url_for('admin_management', section='assessments')
+	} %}
+	{% for label, value in metrics.items() %}
+	{% if me.role == 'admin' %}
+	<a class="metric-link" href="{{ metric_routes[label] }}">
+	{% endif %}
+	<article>
+		<small>{{ label }}</small>
+		<strong>{% if value is number and ('fees' in label|lower or 'pending' in label|lower) %}₹{{ '{:,.0f}'.format(value) }}{% elif label == 'Average Attendance' or label == 'Academic Performance Average' %}{{ value }}%{% else %}{{ value }}{% endif %}</strong>
+		<span>Live academic data</span>
+	</article>
+	{% if me.role == 'admin' %}
+	</a>
+	{% endif %}
+	{% endfor %}
+</section>
+
+<div class="grid-two">
+	{% if chart %}
+	<section class="panel">
+		<h2>Student distribution</h2>
+		<div class="bars">
+			{% for x in chart['labels'] %}
+			<div>
+				{% if me.role == 'admin' %}<a href="{{ url_for('admin_management', section='students', course=x) }}">{{ x }}</a>{% else %}<span>{{ x }}</span>{% endif %}
+				<i data-height="{{ chart['values'][loop.index0] * 6 + 18 }}"></i>
+				<b>{{ chart['values'][loop.index0] }}</b>
+			</div>
+			{% endfor %}
+		</div>
+	</section>
+	{% endif %}
+	{% if prediction or me.role == 'admin' %}
+	<section class="panel">
+		<h2>Performance prediction</h2>
+		{% if prediction %}
+		<div class="prediction-box">
+			<strong>{{ prediction.label }}</strong>
+			<span>{{ prediction.score }}%</span>
+			<p>{{ prediction.summary }}</p>
+			<a href="{{ url_for('predict') }}">Open prediction tool</a>
+		</div>
+		{% else %}
+		<p class="muted">No individual prediction has been saved yet.</p>
+		<a href="{{ url_for('predict') }}">Open prediction tool</a>
+		{% endif %}
+	</section>
+	{% endif %}
+	<section class="panel notices">
+		<h2>Latest notices</h2>
+		{% for n in notices %}
+		<article>
+			<span>{{ n.category }}</span>
+			<b>{{ n.title }}</b>
+			<p>{{ n.body }}</p>
+			<small>{{ n.published_on.strftime('%d %b %Y') }}</small>
+		</article>
+		{% else %}
+		<p class="muted">No notices published.</p>
+		{% endfor %}
+	</section>
+</div>
+
+{% if me.role in ['admin', 'staff'] %}
+<section class="panel report-actions">
+	<h2>Quick reports</h2>
+	<a href="{{ url_for('report', name='students') }}">Students CSV</a>
+	<a href="{{ url_for('report', name='attendance') }}">Attendance CSV</a>
+	<a href="{{ url_for('report', name='marks') }}">Marks CSV</a>
+	{% if me.role == 'admin' %}
+	<a href="{{ url_for('report', name='fees') }}">Fee CSV</a>
+	{% endif %}
+</section>
+{% endif %}
+
+<script>
+	document.querySelectorAll('.bars i[data-height]').forEach((bar) => {
+		bar.style.height = `${bar.dataset.height}px`;
+	});
+</script>
+{% endblock %}

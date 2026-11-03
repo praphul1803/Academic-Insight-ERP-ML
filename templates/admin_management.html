@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <div class="eyebrow"><a href="{{ url_for('admin_dashboard') }}">Admin</a> / {{ title }}</div>
+    <h1>{{ title }}</h1>
+    <p>Manage ERP records using the current college database.</p>
+  </div>
+  <a class="primary" href="{{ url_for('admin_dashboard') }}">Back to Dashboard</a>
+</header>
+
+<section class="panel admin-form-panel">
+  <h2>{{ 'Edit record' if record else 'Add new record' }}</h2>
+  <form method="post" class="form-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="save">
+    {% if record %}<input type="hidden" name="record_id" value="{{ record.id }}">{% endif %}
+    {% for name, label, kind, required in fields %}
+      <label class="admin-field">
+        <span>{{ label }}</span>
+        {% set value = record|attr(name) if record else '' %}
+        {% if kind == 'textarea' %}
+          <textarea name="{{ name }}" {% if required %}required{% endif %}>{{ value or '' }}</textarea>
+        {% elif kind == 'checkbox' %}
+          <input type="checkbox" name="{{ name }}" {% if value or not record %}checked{% endif %}>
+        {% elif kind == 'course' %}
+          <select name="{{ name }}" required>
+            <option value="">Select a course</option>
+            {% for option in courses %}
+              <option value="{{ option.name }}" {% if value == option.name %}selected{% endif %}>{{ option.name }}</option>
+            {% endfor %}
+          </select>
+        {% elif kind == 'course_select' %}
+          <select name="{{ name }}">
+            <option value="">No course assigned</option>
+            {% for option in courses %}
+              <option value="{{ option.id }}" {% if value == option.id %}selected{% endif %}>{{ option.name }} · {{ option.code }}</option>
+            {% endfor %}
+          </select>
+        {% elif kind == 'staff_select' %}
+          <select name="{{ name }}">
+            <option value="">Unassigned</option>
+            {% for option in staff %}
+              <option value="{{ option.id }}" {% if value == option.id %}selected{% endif %}>{{ option.full_name }}</option>
+            {% endfor %}
+          </select>
+        {% elif kind == 'student_select' %}
+          <select name="{{ name }}" required>
+            <option value="">Select a student</option>
+            {% for option in students %}
+              <option value="{{ option.id }}" {% if value == option.id %}selected{% endif %}>{{ option.full_name }} · {{ option.student_code }}</option>
+            {% endfor %}
+          </select>
+        {% elif kind == 'subject_select' %}
+          <select name="{{ name }}" required>
+            <option value="">Select a subject</option>
+            {% for option in subjects %}
+              <option value="{{ option.id }}" {% if value == option.id %}selected{% endif %}>{{ option.name }} · {{ option.code }}</option>
+            {% endfor %}
+          </select>
+        {% elif kind == 'attendance_status' %}
+          <select name="{{ name }}" required>
+            {% for option in ['Present', 'Absent'] %}
+              <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        {% elif kind == 'audience' %}
+          <select name="{{ name }}" required>
+            {% for option in ['All', 'Student', 'Staff'] %}
+              <option value="{{ option }}" {% if value == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input
+            name="{{ name }}"
+            type="{{ 'number' if kind in ['number', 'money', 'unit_test', 'assignment', 'quiz'] else kind }}"
+            value="{{ value if record else (today.isoformat() if kind == 'date' else '') }}"
+            {% if kind in ['number', 'unit_test', 'assignment', 'quiz'] %}min="0" step="1"{% endif %}
+            {% if kind == 'money' %}min="0" step="0.01"{% endif %}
+            {% if kind == 'unit_test' %}max="20" step="0.1"{% endif %}
+            {% if kind == 'assignment' %}max="20" step="0.1"{% endif %}
+            {% if kind == 'quiz' %}max="10" step="0.1"{% endif %}
+            {% if required or (section in ['staff', 'students'] and not record and name == 'password') %}required{% endif %}>
+        {% endif %}
+      </label>
+    {% endfor %}
+    <div class="admin-form-actions">
+      <button class="primary" type="submit">{{ 'Save changes' if record else 'Add record' }}</button>
+      {% if record %}<a class="link" href="{{ url_for('admin_management', section=section) }}">Cancel edit</a>{% endif %}
+    </div>
+  </form>
+</section>
+
+{% if section in ['students', 'attendance', 'assessments', 'fees'] %}
+<form class="filters admin-filters" method="get">
+  <input name="q" value="{{ filters.q }}" placeholder="{% if section == 'fees' %}Search student or roll number{% elif section == 'students' %}Name, roll number, or email{% elif section == 'attendance' %}Student or roll number{% else %}Student, roll number, or subject{% endif %}">
+  {% if section == 'students' %}
+    <select name="course"><option value="">All courses</option>{% for item in courses_used %}<option value="{{ item }}" {% if filters.course == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="department"><option value="">All departments</option>{% for item in departments %}<option value="{{ item }}" {% if filters.department == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="semester"><option value="">All semesters</option>{% for item in semesters %}<option value="{{ item }}" {% if filters.semester == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="division"><option value="">All divisions</option>{% for item in divisions %}<option value="{{ item }}" {% if filters.division == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+  {% elif section == 'attendance' %}
+    <select name="course"><option value="">All courses</option>{% for item in courses_used %}<option value="{{ item }}" {% if filters.course == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="semester"><option value="">All semesters</option>{% for item in semesters %}<option value="{{ item }}" {% if filters.semester == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="division"><option value="">All divisions</option>{% for item in divisions %}<option value="{{ item }}" {% if filters.division == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <input type="date" name="date" value="{{ filters.date }}">
+  {% elif section == 'assessments' %}
+    <select name="course"><option value="">All courses</option>{% for item in courses_used %}<option value="{{ item }}" {% if filters.course == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="semester"><option value="">All semesters</option>{% for item in semesters %}<option value="{{ item }}" {% if filters.semester == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+    <select name="assessment_type">
+      <option value="" {% if not filters.assessment_type %}selected{% endif %}>All assessment components</option>
+      <option value="unit_test" {% if filters.assessment_type == 'unit_test' %}selected{% endif %}>Unit Test</option>
+      <option value="assignment" {% if filters.assessment_type == 'assignment' %}selected{% endif %}>Assignment</option>
+      <option value="quiz" {% if filters.assessment_type == 'quiz' %}selected{% endif %}>Quiz</option>
+    </select>
+  {% else %}
+    <select name="status"><option value="">All payment statuses</option><option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Paid</option><option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>Pending</option></select>
+  {% endif %}
+  <button type="submit">Search / Filter</button>
+  {% if section == 'attendance' %}<a class="primary" href="{{ url_for('report', name='attendance') }}">Download report</a>{% endif %}
+  {% if section == 'assessments' %}<a class="primary" href="{{ url_for('report', name='assessments') }}">Download report</a>{% endif %}
+  {% if section == 'fees' %}<a class="primary" href="{{ url_for('report', name='fees') }}">Download report</a>{% endif %}
+</form>
+{% elif section in ['staff', 'courses', 'subjects', 'notices'] %}
+<form class="filters admin-filters" method="get">
+  <input name="q" value="{{ filters.q }}" placeholder="Search {{ section }}">
+  {% if section == 'notices' %}
+    <select name="status"><option value="">All notices</option><option value="published" {% if filters.status == 'published' %}selected{% endif %}>Published</option><option value="draft" {% if filters.status == 'draft' %}selected{% endif %}>Unpublished</option></select>
+  {% endif %}
+  <button type="submit">Search</button>
+</form>
+{% endif %}
+
+{% if detail_record and section == 'students' %}
+<section class="panel">
+  <h2>Student details · {{ detail_record.full_name }}</h2>
+  <div class="admin-detail-grid">
+    <div><b>Roll number</b><span>{{ detail_record.student_code }}</span></div>
+    <div><b>Email</b><span>{{ detail_record.email }}</span></div>
+    <div><b>Phone</b><span>{{ detail_record.phone or '—' }}</span></div>
+    <div><b>Course</b><span>{{ detail_record.course }}</span></div>
+    <div><b>Department</b><span>{{ detail_record.department }}</span></div>
+    <div><b>Semester / Division</b><span>{{ detail_record.semester }} / {{ detail_record.division }}</span></div>
+    <div><b>Attendance</b><span>{{ attendance_pct(detail_record.id) }}%</span></div>
+    <div><b>Fee balance</b><span>{{ '%.2f'|format(detail_record.fee.pending) if detail_record.fee else 'No fee record' }}</span></div>
+  </div>
+  <h3 class="admin-subheading">Attendance summary</h3>
+  <div class="table-panel"><table><thead><tr><th>Subject</th><th>Present</th><th>Total Records</th><th>Attendance</th></tr></thead><tbody>
+    {% for item in attendance_summary %}<tr><td>{{ item.subject }}</td><td>{{ item.present }}</td><td>{{ item.total }}</td><td>{{ item.percentage }}%</td></tr>{% else %}<tr><td colspan="4">No attendance records.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <h3 class="admin-subheading">Academic records</h3>
+  <div class="table-panel"><table><thead><tr><th>Subject</th><th>Unit Test</th><th>Assignment</th><th>Quiz</th><th>Total / 50</th></tr></thead><tbody>
+    {% for item in detail_record.assessment_records %}<tr><td>{{ item.subject.name }}</td><td>{{ item.unit_test_marks }}</td><td>{{ item.assignment_marks }}</td><td>{{ item.quiz_marks }}</td><td>{{ item.total }}</td></tr>{% else %}<tr><td colspan="5">No structured assessment entries.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <h3 class="admin-subheading">Existing internal marks</h3>
+  <div class="table-panel"><table><thead><tr><th>Subject</th><th>Test 1</th><th>Test 2</th><th>Assignment</th><th>Practical</th><th>Project</th><th>Total</th></tr></thead><tbody>
+    {% for item in detail_record.marks %}<tr><td>{{ item.subject }}</td><td>{{ item.test1 }}</td><td>{{ item.test2 }}</td><td>{{ item.assignment }}</td><td>{{ item.practical }}</td><td>{{ item.project }}</td><td>{{ item.total }}</td></tr>{% else %}<tr><td colspan="7">No legacy mark records.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endif %}
+
+<section class="panel table-panel">
+  <table>
+    <thead>
+      {% if section == 'students' %}<tr><th>Roll Number</th><th>Student</th><th>Course</th><th>Term</th><th>Phone</th><th>Status</th><th>Actions</th></tr>
+      {% elif section == 'staff' %}<tr><th>Employee</th><th>Name / Email</th><th>Department</th><th>Assigned Subjects</th><th>Account</th><th>Actions</th></tr>
+      {% elif section == 'courses' %}<tr><th>Code</th><th>Course</th><th>Department</th><th>Duration</th><th>Enrolled Students</th><th>Actions</th></tr>
+      {% elif section == 'subjects' %}<tr><th>Code</th><th>Subject</th><th>Course / Semester</th><th>Assigned Staff</th><th>Actions</th></tr>
+      {% elif section == 'attendance' %}<tr><th>Date / Period</th><th>Student</th><th>Course / Term</th><th>Subject</th><th>Status</th><th>Actions</th></tr>
+      {% elif section == 'assessments' %}<tr><th>Student</th><th>Course / Term</th><th>Subject</th>{% if filters.assessment_type == 'unit_test' %}<th>Unit Test /20</th>{% elif filters.assessment_type == 'assignment' %}<th>Assignment /20</th>{% elif filters.assessment_type == 'quiz' %}<th>Quiz /10</th>{% else %}<th>Unit Test /20</th><th>Assignment /20</th><th>Quiz /10</th>{% endif %}<th>Total /50</th><th>Actions</th></tr>
+      {% elif section == 'fees' %}<tr><th>Student</th><th>Total Fees</th><th>Paid</th><th>Pending</th><th>Status</th><th>Payment Date</th><th>Actions</th></tr>
+      {% else %}<tr><th>Notice</th><th>Audience</th><th>Category / Date</th><th>Publication</th><th>Actions</th></tr>{% endif %}
+    </thead>
+    <tbody>
+      {% for row in records %}
+      <tr>
+        {% if section == 'students' %}
+          <td>{{ row.student_code }}</td><td><b>{{ row.full_name }}</b><small>{{ row.email }}</small></td><td>{{ row.course }}<small>{{ row.department }}</small></td><td>{{ row.semester }} · {{ row.division }}</td><td>{{ row.phone or '—' }}</td><td><span class="pill {{ 'good' if row.user.active else 'bad' }}">{{ 'Active' if row.user.active else 'Inactive' }}</span></td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a> · <a class="link" href="{{ url_for('admin_management', section=section, details=row.id) }}">Details</a>
+            <form method="post" class="inline-action"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="toggle"><input type="hidden" name="record_id" value="{{ row.id }}"><button class="link">{{ 'Deactivate' if row.user.active else 'Activate' }}</button></form>
+        {% elif section == 'staff' %}
+          <td>{{ row.employee_code }}</td><td><b>{{ row.full_name }}</b><small>{{ row.email }}{% if row.phone %} · {{ row.phone }}{% endif %}</small></td><td>{{ row.department }}</td><td>{{ row.assigned_subjects or '—' }}</td><td><span class="pill {{ 'good' if row.user.active else 'bad' }}">{{ 'Active' if row.user.active else 'Inactive' }}</span></td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+            <form method="post" class="inline-action"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="toggle"><input type="hidden" name="record_id" value="{{ row.id }}"><button class="link">{{ 'Deactivate' if row.user.active else 'Activate' }}</button></form>
+        {% elif section == 'courses' %}
+          <td>{{ row.code }}</td><td><b>{{ row.name }}</b><small>{{ row.description }}</small></td><td>{{ row.department }}</td><td>{{ row.duration_years }} years</td>          <td><a href="{{ url_for('admin_management', section='students', course=row.name) }}">{{ row.name|course_student_count }} students</a></td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+        {% elif section == 'subjects' %}
+          <td>{{ row.code }}</td><td>{{ row.name }}</td><td>{{ row.course.name if row.course else '—' }} · Sem {{ row.semester }}</td><td>{{ row.staff.full_name if row.staff else 'Unassigned' }}</td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+        {% elif section == 'attendance' %}
+          <td>{{ row.attendance_date.strftime('%d %b %Y') }} · P{{ row.period }}</td>          <td><a href="{{ url_for('admin_management', section='students', details=row.student.id) }}"><b>{{ row.student.full_name }}</b></a><small>{{ row.student.student_code }}</small></td><td>{{ row.student.course }} · Sem {{ row.student.semester }} {{ row.student.division }}</td><td>{{ row.subject }}</td><td>{{ row.status }}</td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+        {% elif section == 'assessments' %}
+          <td><b>{{ row.student.full_name }}</b><small>{{ row.student.student_code }}</small></td><td>{{ row.student.course }} · Sem {{ row.student.semester }}</td><td>{{ row.subject.name }}</td>{% if filters.assessment_type == 'unit_test' %}<td>{{ row.unit_test_marks }}</td>{% elif filters.assessment_type == 'assignment' %}<td>{{ row.assignment_marks }}</td>{% elif filters.assessment_type == 'quiz' %}<td>{{ row.quiz_marks }}</td>{% else %}<td>{{ row.unit_test_marks }}</td><td>{{ row.assignment_marks }}</td><td>{{ row.quiz_marks }}</td>{% endif %}<td>{{ row.total }}</td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+        {% elif section == 'fees' %}
+          <td><b>{{ row.student.full_name }}</b><small>{{ row.student.student_code }}</small></td><td>{{ '%.2f'|format(row.total) }}</td><td>{{ '%.2f'|format(row.paid) }}</td><td>{{ '%.2f'|format(row.pending) }}</td><td><span class="pill {{ 'good' if row.pending == 0 else 'bad' }}">{{ 'Paid' if row.pending == 0 else 'Pending' }}</span></td><td>{% for payment in row.payments %}<small>{{ payment.payment_date.strftime('%d %b %Y') }} · {{ '%.2f'|format(payment.amount) }}{% if payment.reference %} · {{ payment.reference }}{% endif %}</small>{% else %}—{% endfor %}</td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+            {% if row.pending > 0 %}<form method="post" action="{{ url_for('admin_record_fee_payment', fee_id=row.id) }}" class="inline-action"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input name="amount" type="number" step="0.01" min="0.01" max="{{ row.pending }}" placeholder="Payment" required><input name="payment_date" type="date" value="{{ today.isoformat() }}" required><input name="reference" placeholder="Reference"><button class="link">Record payment</button></form>{% endif %}
+        {% else %}
+          <td><b>{{ row.title }}</b><small>{{ row.body }}</small></td><td>{{ row.audience }}</td><td>{{ row.category }}<small>{{ row.published_on.strftime('%d %b %Y') }}</small></td><td><span class="pill {{ 'good' if row.is_published else 'bad' }}">{{ 'Published' if row.is_published else 'Unpublished' }}</span></td>
+          <td><a class="link" href="{{ url_for('admin_management', section=section, edit=row.id) }}">Edit</a>
+            <form method="post" class="inline-action"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="toggle"><input type="hidden" name="record_id" value="{{ row.id }}"><button class="link">{{ 'Unpublish' if row.is_published else 'Publish' }}</button></form>
+        {% endif %}
+          <form method="post" class="inline-action" onsubmit="return confirm('Delete this record? This may not be reversible.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="record_id" value="{{ row.id }}"><button class="link danger-link">Delete</button>
+          </form>
+          </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted">No matching records found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if pages > 1 %}
+<nav class="admin-pagination" aria-label="Pagination">
+  {% if page > 1 %}<a class="primary" href="{{ url_for('admin_management', section=section, page=page-1, q=filters.q, course=filters.course, department=filters.department, semester=filters.semester, division=filters.division, status=filters.status, assessment_type=filters.assessment_type, date=filters.date) }}">Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="primary" href="{{ url_for('admin_management', section=section, page=page+1, q=filters.q, course=filters.course, department=filters.department, semester=filters.semester, division=filters.division, status=filters.status, assessment_type=filters.assessment_type, date=filters.date) }}">Next</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

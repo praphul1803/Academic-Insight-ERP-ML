@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <div class="eyebrow"><a href="{{ url_for('staff_dashboard') }}">Staff</a> / Staff tools</div>
+    <h1>Bulk Student Performance Prediction</h1>
+    <p>Upload assessment records, evaluate using Unit Test, Assignment and Quiz marks, and review results with slow learner identification.</p>
+  </div>
+  <a class="primary" href="{{ url_for('staff_dashboard') }}">Back to Dashboard</a>
+</header>
+
+<section class="panel" style="margin-bottom: 22px;">
+  <h2>Upload CSV file</h2>
+  <form method="post" enctype="multipart/form-data" class="inline" style="align-items: center; flex-wrap: wrap;">
+    <input type="file" name="csv_file" accept=".csv" required>
+    <button class="primary">Process predictions</button>
+    <a class="primary" href="{{ url_for('bulk_prediction_template') }}">Download sample CSV template</a>
+  </form>
+</section>
+
+{% if selected_batch %}
+<section class="metrics">
+  <article>
+    <small>Total Students Processed</small>
+    <strong>{{ selected_batch.total_students }}</strong>
+    <span>Assessment batch</span>
+  </article>
+  <article>
+    <small>Average Class Performance</small>
+    <strong>{{ '%.1f'|format(average_class_performance) }}%</strong>
+    <span>Out of 50 marks</span>
+  </article>
+  <article>
+    <small>Good Performance Students</small>
+    <strong>{{ selected_batch.good_students }}</strong>
+    <span>70% and above</span>
+  </article>
+  <article>
+    <small>Average Performance Students</small>
+    <strong>{{ selected_batch.average_students }}</strong>
+    <span>40% to 69%</span>
+  </article>
+  <article>
+    <small>Poor Performance Students</small>
+    <strong>{{ selected_batch.poor_students }}</strong>
+    <span>Below 40%</span>
+  </article>
+  <article>
+    <small>Total Slow Learners</small>
+    <strong>{{ selected_batch.slow_learners }}</strong>
+    <span>Below 20/50</span>
+  </article>
+</section>
+
+<section class="panel" style="margin-bottom: 20px;">
+  <h2>Class performance distribution</h2>
+  <div class="row align-items-center g-4">
+    <div class="col-md-6">
+      <div style="max-width: 380px; margin: 0 auto;">
+        <canvas id="bulk-performance-chart" role="img" aria-label="Pie chart showing bulk class performance distribution"></canvas>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <p><strong>Total students processed:</strong> {{ bulk_chart_data.total_students }}</p>
+      <ul class="list-unstyled mb-3">
+        {% for index in range(bulk_chart_data.labels|length) %}
+          <li class="d-flex justify-content-between gap-3 py-1">
+            <span>{{ bulk_chart_data.labels[index] }}</span>
+            <strong>{{ bulk_chart_data['values'][index] }} students ({{ bulk_chart_data.percentages[index] }}%)</strong>
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="mb-0"><strong>Slow learners:</strong> {{ bulk_chart_data.slow_learners }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom: 20px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <h2>Prediction results</h2>
+    <div class="inline">
+      <a class="primary" href="{{ url_for('bulk_prediction_download', batch_id=selected_batch.id) }}">Download Prediction Report CSV</a>
+      <a class="primary" href="{{ url_for('bulk_prediction_slow_learner_download', batch_id=selected_batch.id) }}">Download Slow Learner Report CSV</a>
+    </div>
+  </div>
+
+  <form method="get" class="inline" style="margin: 18px 0; flex-wrap: wrap; align-items: center; gap: 10px;">
+    <input type="hidden" name="batch_id" value="{{ selected_batch.id }}">
+    <input type="text" name="q" value="{{ search_query }}" placeholder="Search student name or roll number" style="min-width: 220px;">
+    <select name="status">
+      <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All performance statuses</option>
+      <option value="Good" {% if status_filter == 'Good' %}selected{% endif %}>Good</option>
+      <option value="Average" {% if status_filter == 'Average' %}selected{% endif %}>Average</option>
+      <option value="Poor" {% if status_filter == 'Poor' %}selected{% endif %}>Poor</option>
+    </select>
+    <select name="sort">
+      <option value="total_marks" {% if sort_by == 'total_marks' %}selected{% endif %}>Sort by total marks</option>
+      <option value="predicted_score" {% if sort_by == 'predicted_score' %}selected{% endif %}>Sort by predicted performance</option>
+    </select>
+    <label style="display:flex; align-items:center; gap:6px; font-size: 14px;">
+      <input type="checkbox" name="slow_only" value="1" {% if slow_only %}checked{% endif %}> Slow learners only
+    </label>
+    <button class="primary" type="submit">Apply filters</button>
+  </form>
+
+  {% if results %}
+  <div class="table-panel">
+    <table>
+      <thead>
+        <tr>
+          <th>Student ID</th>
+          <th>Student Name</th>
+          <th>Unit Test</th>
+          <th>Assignment</th>
+          <th>Quiz</th>
+          <th>Total Marks</th>
+          <th>Overall %</th>
+          <th>ML Predicted Performance</th>
+          <th>Performance Status</th>
+          <th>Slow Learner</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        <tr>
+          <td>{{ row.student_id }}</td>
+          <td>{{ row.student_name }}</td>
+          <td>{{ row.unit_test_marks }}/20</td>
+          <td>{{ row.assignment_marks }}/20</td>
+          <td>{{ row.quiz_marks }}/10</td>
+          <td>{{ row.total_marks }}/50</td>
+          <td>{{ '%.1f'|format(row.overall_percentage) }}%</td>
+          <td><span class="pill {{ 'good' if row.predicted_result == 'Good' else 'good' if row.predicted_result == 'Average' else 'bad' }}">{{ row.predicted_result }}</span></td>
+          <td><span class="pill {{ 'good' if row.performance_status == 'Good' else 'good' if row.performance_status == 'Average' else 'bad' }}">{{ row.performance_status }}</span></td>
+          <td><span class="pill {{ 'bad' if row.slow_learner == 'Yes' else 'good' }}">{{ row.slow_learner }}</span></td>
+          <td><a class="link" href="{{ url_for('bulk_prediction', batch_id=selected_batch.id, detail_id=row.id, q=search_query, status=status_filter, sort=sort_by, slow_only='1' if slow_only else '0') }}">View details</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="muted">No results available for the selected batch.</p>
+  {% endif %}
+</section>
+
+{% if detail_row %}
+<section class="panel">
+  <h2>Student prediction details</h2>
+  <div class="table-panel">
+    <table>
+      <tbody>
+        <tr><th>Student ID / Roll Number</th><td>{{ detail_row.student_id }}</td></tr>
+        <tr><th>Student Name</th><td>{{ detail_row.student_name }}</td></tr>
+        <tr><th>Unit Test Marks</th><td>{{ detail_row.unit_test_marks }}/20</td></tr>
+        <tr><th>Assignment Marks</th><td>{{ detail_row.assignment_marks }}/20</td></tr>
+        <tr><th>Quiz Marks</th><td>{{ detail_row.quiz_marks }}/10</td></tr>
+        <tr><th>Total Marks</th><td>{{ detail_row.total_marks }}/50</td></tr>
+        <tr><th>Overall Performance Percentage</th><td>{{ '%.1f'|format(detail_row.overall_percentage) }}%</td></tr>
+        <tr><th>ML Predicted Performance</th><td>{{ detail_row.predicted_result }}</td></tr>
+        <tr><th>Performance Status</th><td>{{ detail_row.performance_status }}</td></tr>
+        <tr><th>Slow Learner Status</th><td>{{ detail_row.slow_learner }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+<section class="panel">
+  <h2>Slow learner list</h2>
+  {% if batches %}
+  <div class="table-panel">
+    <table>
+      <thead>
+        <tr>
+          <th>Uploaded File</th>
+          <th>Students</th>
+          <th>Slow Learners</th>
+          <th>Created</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for batch in batches %}
+        <tr>
+          <td>{{ batch.filename }}</td>
+          <td>{{ batch.total_students }}</td>
+          <td>{{ batch.slow_learners }}</td>
+          <td>{{ batch.created_at.strftime('%d %b %Y %H:%M') }}</td>
+          <td>
+            <a class="link" href="{{ url_for('bulk_prediction', batch_id=batch.id) }}">View</a>
+            <a class="link" href="{{ url_for('bulk_prediction_download', batch_id=batch.id) }}">Download</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="muted">No prediction batches have been processed yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+{% if selected_batch %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    const canvas = document.getElementById('bulk-performance-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const labels = {{ bulk_chart_data.labels|tojson }};
+    const values = {{ bulk_chart_data['values']|tojson }};
+    const percentages = {{ bulk_chart_data.percentages|tojson }};
+    new Chart(canvas, {
+      type: 'pie',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: ['#22a06b', '#eab308', '#dc4c3f'],
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const index = context.dataIndex;
+                return labels[index] + ': ' + values[index] + ' students (' + percentages[index] + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

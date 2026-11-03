@@ -1,0 +1,4 @@
+Student ID / Roll Number,Student Name,Unit Test Marks,Assignment Marks,Quiz Marks,Total Marks (Out of 50),Overall Performance Percentage,ML Predicted Performance,Performance Status,Slow Learner Status
+BULK001,Good Student,18.0,16.0,8.0,42.0,84.0,Good,Good,No
+BULK002,Average Student,12.0,12.0,6.0,30.0,60.0,Average,Average,No
+BULK003,Poor Student,4.0,4.0,2.0,10.0,20.0,Poor,Poor,Yes

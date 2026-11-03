@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-head">
+  <div><div class="eyebrow"><a href="{{ url_for('staff_dashboard') }}">Staff</a> / Academic records</div><h1>Assessment Management</h1><p>Enter and review assigned-subject Unit Test, Assignment, and Quiz marks out of 50.</p></div>
+  <a class="primary" href="{{ url_for('staff_dashboard') }}">Back to Dashboard</a>
+</header>
+
+<form class="filters admin-filters" method="get">
+  <select name="subject_id">
+    <option value="">Select an assigned subject</option>
+    {% for subject in subjects %}<option value="{{ subject.id }}" {% if selected_subject and selected_subject.id == subject.id %}selected{% endif %}>{{ subject.name }}{% if subject.course %} · {{ subject.course.name }}, Sem {{ subject.semester }}{% endif %}</option>{% endfor %}
+  </select>
+  <input name="q" value="{{ filters.q }}" placeholder="Search student name or roll number">
+  <select name="course"><option value="">All courses</option>{% for item in courses %}<option value="{{ item }}" {% if filters.course == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+  <select name="semester"><option value="">All semesters</option>{% for item in semesters %}<option value="{{ item }}" {% if filters.semester == item %}selected{% endif %}>Semester {{ item }}</option>{% endfor %}</select>
+  <select name="division"><option value="">All divisions</option>{% for item in divisions %}<option value="{{ item }}" {% if filters.division == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select>
+  <input type="date" name="date" value="{{ filters.date }}" aria-label="Filter by date updated">
+  <button type="submit">Search / Filter</button>
+  <a class="primary" href="{{ url_for('report', name='assessments') }}">Download assessment CSV</a>
+</form>
+
+{% if selected_subject %}
+<section class="panel table-panel">
+  <h2>Assigned students · {{ selected_subject.name }}</h2>
+  <table>
+    <thead><tr><th>Roll Number</th><th>Student</th><th>Unit Test /20</th><th>Assignment /20</th><th>Quiz /10</th><th>Total /50</th><th>Overall %</th><th></th></tr></thead>
+    <tbody>
+      {% for student in students %}
+        {% set record = assessment_by_student.get(student.id) %}
+        <tr>
+          <td>{{ student.student_code }}<small>{{ student.course }} · Sem {{ student.semester }} {{ student.division }}</small></td>
+          <td><b>{{ student.full_name }}</b></td>
+          <td colspan="6">
+            <form method="post" class="staff-assessment-form" data-assessment-form>
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="subject_id" value="{{ selected_subject.id }}">
+              <input type="hidden" name="student_id" value="{{ student.id }}">
+              {% if record %}<input type="hidden" name="record_id" value="{{ record.id }}">{% endif %}
+              <input type="hidden" name="course" value="{{ filters.course }}">
+              <input type="hidden" name="semester" value="{{ filters.semester or '' }}">
+              <input type="hidden" name="division" value="{{ filters.division }}">
+              <input type="hidden" name="q" value="{{ filters.q }}">
+              <input type="hidden" name="date" value="{{ filters.date }}">
+              <input type="number" name="unit_test_marks" min="0" max="20" step="0.1" value="{{ record.unit_test_marks if record else '' }}" placeholder="Unit Test" aria-label="Unit Test marks for {{ student.full_name }}" required data-score>
+              <input type="number" name="assignment_marks" min="0" max="20" step="0.1" value="{{ record.assignment_marks if record else '' }}" placeholder="Assignment" aria-label="Assignment marks for {{ student.full_name }}" required data-score>
+              <input type="number" name="quiz_marks" min="0" max="10" step="0.1" value="{{ record.quiz_marks if record else '' }}" placeholder="Quiz" aria-label="Quiz marks for {{ student.full_name }}" required data-score>
+              <span class="staff-assessment-total"><b data-total>{{ record.total if record else '—' }}</b>/50 · <b data-percent>{{ '%.1f'|format(record.total * 2) if record else '—' }}%</b></span>
+              <button class="primary" type="submit">{{ 'Update' if record else 'Save' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="muted">No students are assigned to this subject under the selected filters.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<section class="panel"><p class="muted">Select an assigned subject to display its students and manage their marks.</p></section>
+{% endif %}
+
+<section class="panel table-panel">
+  <h2>Assessment history</h2>
+  <table><thead><tr><th>Student</th><th>Subject</th><th>Course / Term</th><th>Unit Test</th><th>Assignment</th><th>Quiz</th><th>Total /50</th><th>Percentage</th><th>Updated</th></tr></thead><tbody>
+    {% for row in records %}
+      <tr><td><b>{{ row.student.full_name }}</b><small>{{ row.student.student_code }}</small></td><td>{{ row.subject.name }}</td><td>{{ row.student.course }} · {{ row.student.semester }} {{ row.student.division }}</td><td>{{ row.unit_test_marks }}</td><td>{{ row.assignment_marks }}</td><td>{{ row.quiz_marks }}</td><td>{{ row.total }}</td><td>{{ '%.1f'|format(row.total * 2) }}%</td><td>{{ row.updated_at.strftime('%d %b %Y %H:%M') }}</td></tr>
+    {% else %}<tr><td colspan="9" class="muted">No assessment history matches the selected filters.</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+{% endblock %}
+{% block page_scripts %}
+<script>
+  document.querySelectorAll('[data-assessment-form]').forEach((form) => {
+    const scores = [...form.querySelectorAll('[data-score]')];
+    const total = form.querySelector('[data-total]');
+    const percentage = form.querySelector('[data-percent]');
+    const update = () => {
+      if (scores.some((input) => input.value === '')) return;
+      const value = scores.reduce((sum, input) => sum + Number(input.value), 0);
+      total.textContent = value.toFixed(1).replace(/\.0$/, '');
+      percentage.textContent = `${(value * 2).toFixed(1)}%`;
+    };
+    scores.forEach((input) => input.addEventListener('input', update));
+  });
+</script>
+{% endblock %}
